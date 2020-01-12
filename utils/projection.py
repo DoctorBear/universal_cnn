@@ -138,6 +138,29 @@ def get_splitter_end(sum_array, default_end=True):
             if right > 0 and cur == 0 and left == 0:
                 splitters.append(j)
                 break
+        splitters.append(len(sum_array)-1)
+        splitters = [0] + splitters
+    return splitters
+
+
+def get_re_splitter_end(sum_array, default_end=True):
+    """
+    difference with method get_splitter_end is the gap is 1 instead of 2.
+    :param default_end: add a splitter at the end of content
+    :param sum_array: the projective histogram array
+    :return:
+    """
+    splitters = []
+    for i in range(1, len(sum_array) - 3):
+        left, cur, right, right1, right2 = sum_array[i - 1:i + 4]
+        if right > 0 and cur == 0:
+            splitters.append(i)
+    if default_end:
+        for j in range(len(sum_array) - 2, 2, -1):
+            right, cur, left = sum_array[j - 1:j + 2]
+            if right > 0 and cur == 0:
+                splitters.append(j)
+                break
         if len(splitters) == 1:
             splitters.append(len(sum_array)-1)
     return splitters

@@ -111,6 +111,7 @@ class AbstractData:
 
     def init_indices(self):
         samples = self.size()
+        print("samples:"+str(samples))
         self.indices = np.arange(0, samples, dtype=np.int32)
         self.batch_ptr = 0
         return self
@@ -118,6 +119,8 @@ class AbstractData:
     def next_batch(self, batch_size):
         start, end = self.batch_ptr, self.batch_ptr + batch_size
         end = end if end <= len(self.indices) else len(self.indices)
+        print("start:"+str(start))
+        print("size:"+str(self.size()))
         if start >= self.size():
             return None
         else:

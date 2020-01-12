@@ -1,7 +1,8 @@
 import threading
-from typing import Tuple
+from typing import Tuple, List
 
 import cv2 as cv
+import numpy as np
 
 import utils.rectification as rct
 import utils.uimg as uimg
@@ -27,30 +28,39 @@ class Processor(object):
         return Processor._instance
 
     def _process(self, page_path: str, p_thresh: float, auxiliary_img: str,
-                 box: Tuple[float, float, float, float] = None, remove_lines: bool = False) -> TextPage:
-        print(page_path)
+                 box: List[int] = None, remove_lines: bool = False) -> TextPage:
         src = uimg.read(page_path, 1)
         _page = TextPage(src, 0)
         # 1.
-        _page.auto_bin()
+        # _page.auto_bin()
         if box is not None:
             x1, y1, x2, y2 = box
-            x1 = int(x1 * src.shape[1])
-            y1 = int(y1 * src.shape[0])
-            x2 = int(x2 * src.shape[1])
-            y2 = int(y2 * src.shape[0])
-            if x1 > x2: x1, x2 = x2, x1
-            if y1 > y2: y1, y2 = y2, y1
+            # x1 = int(x1 * src.shape[1])
+            # y1 = int(y1 * src.shape[0])
+            # x2 = int(x2 * src.shape[1])
+            # y2 = int(y2 * src.shape[0])
+            if x1 > x2:
+                x1, x2 = x2, x1
+            if y1 > y2:
+                y1, y2 = y2, y1
             region_img = _page.img[y1:y2, x1:x2]
         else:
             region_img = _page.img
+
         region = TextPage(region_img, 0, drawing_copy=None)
+        uimg.save('static/1.jpg', region_img)
+        region.auto_bin()
+
+        if np.mean(region.img) < 128:
+            region.img = uimg.reverse(region.img)
 
         if remove_lines:
             region.remove_lines(origin_size=src.shape[:2])
 
         if auxiliary_img is not None and auxiliary_img != '':
             region.drawing_copy = cv.cvtColor(region.img.copy(), cv.COLOR_GRAY2BGR)
+
+            uimg.save('static/2.jpg', region.drawing_copy)
 
             # 2.
             # fixme 低分辨率旋转校正报错
@@ -59,14 +69,17 @@ class Processor(object):
             # 3. & 4.
             region.split()
 
+        # uimg.save(auxiliary_img[:-4]+'line.jpg', region.get_lines()[0].drawing_copy)
         # 5. & 6.
-        self.data.set_images(region.make_infer_input_1()).init_indices()
+        self.data.set_images(region.make_infer_input_1(auxiliary_img[-8:-4])).init_indices()
         results = self.main.infer(infer_data=self.data, batch_size=self.batch_size)
-
         # 7.
         region.set_result_1(results)
+        # p_thresh 预测分数的阈值，过滤掉小于阈值的char,此处为懒删除标记为invalid
         region.filter_by_p(p_thresh=p_thresh)
+
         for line in region.get_lines(ignore_empty=True):
+            print("标准宽度： "+str(line.get_relative_standard_width()))
             line.mark_half()
             # line.calculate_meanline_regression()
             line.merge_components()
@@ -90,17 +103,17 @@ class Processor(object):
         return region
 
     def get_json_result(self, page_path: str, p_thresh: float, auxiliary_img: str,
-                        box: Tuple[float, float, float, float] = None, remove_lines=False):
+                        box: List[int] = None, remove_lines=False):
         page = self._process(page_path, p_thresh, auxiliary_img, box=box, remove_lines=remove_lines)
         return page.format_json(p_thresh=p_thresh)
 
     def get_text_result(self, page_path: str, p_thresh: float, auxiliary_img: str,
-                        box: Tuple[float, float, float, float] = None, remove_lines=False):
+                        box: List[int] = None, remove_lines=False):
         page = self._process(page_path, p_thresh, auxiliary_img, box=box, remove_lines=remove_lines)
         return page.format_result(p_thresh=p_thresh)
 
     def get_verbose_result(self, page_path: str, p_thresh: float, auxiliary_img: str,
-                           box: Tuple[float, float, float, float] = None, remove_lines=False):
+                           box: List[int] = None, remove_lines=False):
         page = self._process(page_path, p_thresh, auxiliary_img, box=box, remove_lines=remove_lines)
         return page.format_verbose(p_thresh=p_thresh)
 

@@ -3,6 +3,49 @@ import numpy as np
 from matplotlib import pyplot as plt
 
 
+def get_bounds(img, foreground_color='black'):
+    """
+    Get the minimum rectangle box containing the text. This method assumes that:
+        1. there is no noise in the given image
+    :param foreground_color:
+    :param img: input image, of which the pixel value should either be `0` or `255`
+    :return: top, left, bottom, right
+    > FYI: image_height = bottom - top, image_width = right - left
+    """
+    assert foreground_color in ('white', 'black')
+    h, w = img.shape
+    # print(h, w)
+    background_vertical = np.zeros((h,), np.uint8) if foreground_color == 'white' else np.ones((h,), np.uint8) * 255
+    background_horizontal = np.zeros((w,), np.uint8) if foreground_color == 'white' else np.ones((w,), np.uint8) * 255
+    for left in range(w):
+        if not (img[:, left] == background_vertical).all():
+            break
+    else:
+        left = None
+
+    for right in range(w - 1, -1, -1):
+        if not (img[:, right] == background_vertical).all():
+            right += 1
+            break
+    else:
+        right = None
+
+    for top in range(h):
+        if not (img[top, :] == background_horizontal).all():
+            break
+    else:
+        top = None
+
+    for bottom in range(h - 1, -1, -1):
+        if not (img[bottom, :] == background_horizontal).all():
+            bottom += 1
+            break
+    else:
+        bottom = None
+
+    return top, left, bottom, right
+
+
 def save(file_path: str, img):
     """
     Do not use `cv2.imwrite` to save image, doesn't work as expected when it comes to Chinese file name
@@ -40,8 +83,9 @@ def auto_bin(img, otsu: bool = False):
     """
     # 读取图像，并转为灰度图
     img_grey = cv.cvtColor(img, cv.COLOR_BGR2GRAY) if len(img.shape) == 3 and img.shape[2] == 3 else img
+
     if otsu:
-        return cv.threshold(img_grey, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU)[1]
+        return cv.threshold(img_grey, 0, 255, cv.THRESH_BINARY | cv.THRESH_OTSU)[1]
     # 自适应二值化
     img_at_mean = cv.adaptiveThreshold(img_grey, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 47, 10)
     return img_at_mean
@@ -53,10 +97,12 @@ def thresh_bin(img, minv=150, maxv=255, type=cv.THRESH_BINARY_INV):
     _, threshold = cv.threshold(img_grey, minv, maxv, type)
     return threshold
 
+
 # 边缘检测
 def canny_bin(img, minv=50, maxv=150, apertureSize=3):
-    img_canny = cv.cv.Canny(img, minv, maxv, apertureSize)
+    img_canny = cv.Canny(img, minv, maxv, apertureSize)
     return img_canny
+
 
 # 腐蚀
 def erode_img(img, kernal_heght, kernal_width):
@@ -82,7 +128,8 @@ def fit_resize(img, new_height, new_width):
     rate = max(h_rate, w_rate)
     dsize = int(width / rate), int(height / rate)
     try:
-        resized_img = auto_bin(cv.resize(img, dsize), otsu=True) if rate >= 1 else img
+        resized_img = auto_bin(cv.resize(img, dsize), otsu=True)
+            # if rate >= 1 else img
         return pad_to(resized_img, new_height, new_width, 255)
     except cv.error:
         return None

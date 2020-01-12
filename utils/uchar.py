@@ -6,49 +6,6 @@ import numpy as np
 import utils.uimg as uimg
 
 
-def get_bounds(img, foreground_color='black'):
-    """
-    Get the minimum rectangle box containing the text. This method assumes that:
-        1. there is no noise in the given image
-    :param foreground_color:
-    :param img: input image, of which the pixel value should either be `0` or `255`
-    :return: top, left, bottom, right
-    > FYI: image_height = bottom - top, image_width = right - left
-    """
-    assert foreground_color in ('white', 'black')
-    h, w = img.shape
-    # print(h, w)
-    background_vertical = np.zeros((h,), np.uint8) if foreground_color == 'white' else np.ones((h,), np.uint8) * 255
-    background_horizontal = np.zeros((w,), np.uint8) if foreground_color == 'white' else np.ones((w,), np.uint8) * 255
-    for left in range(w):
-        if not (img[:, left] == background_vertical).all():
-            break
-    else:
-        left = None
-
-    for right in range(w - 1, -1, -1):
-        if not (img[:, right] == background_vertical).all():
-            right += 1
-            break
-    else:
-        right = None
-
-    for top in range(h):
-        if not (img[top, :] == background_horizontal).all():
-            break
-    else:
-        top = None
-
-    for bottom in range(h - 1, -1, -1):
-        if not (img[bottom, :] == background_horizontal).all():
-            bottom += 1
-            break
-    else:
-        bottom = None
-
-    return top, left, bottom, right
-
-
 def to_size(img, new_height, new_width):
     """
     text area in the `img` is called `text_img`, the target is to scale `text_img` to `(new_height, new_width)`
@@ -58,12 +15,13 @@ def to_size(img, new_height, new_width):
     :param new_width:
     :return:
     """
-    top, left, bottom, right = get_bounds(img, foreground_color='black')
-    text_img = img[top:bottom, left:right]
+    top, left, bottom, right = uimg.get_bounds(img, foreground_color='black')
+    text_img = img[:, left:right]
+    print("top: "+str(top) + "bottom: " + str(img.shape[0] - bottom))
     if 0 in text_img.shape or None in (top, left, bottom, right):
         # 宽或高为0
         return None
-    text_img = uimg.pad_to(text_img, int(1.4*(bottom-top)), int(1.4*(right-left)), 255)
+    text_img = uimg.pad_to(text_img, int(1.4*img.shape[0]), int(1.4*(right-left)), 255)
     out_img = uimg.fit_resize(text_img, new_height, new_width)
     return out_img
 

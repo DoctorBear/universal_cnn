@@ -14,6 +14,7 @@ from utils.orientation import fix_orientation
 HALF_WIDTH_THRESH_FACTOR = 0.8
 MAX_MERGE_WIDTH = 1.35
 DEFAULT_NOISE_P_THRESH = 0.5
+MULTI_CHAR_THRESH_FACTOR = 1.0
 
 # 汉字，不包含汉字的标点符号
 ptn = re.compile('[\u4e00-\u9fa5]')
@@ -54,7 +55,7 @@ class TextChar:
         > If it is an empty image, the 4 values would be `None`
         :return: None
         """
-        self.content_top, self.content_left, self.content_bottom, self.content_right = uchar.get_bounds(
+        self.content_top, self.content_left, self.content_bottom, self.content_right = uimg.get_bounds(
             self.img)
 
     def has_content(self) -> bool:
@@ -129,7 +130,7 @@ class TextChar:
         Resize the char image to fit the tensorflow model input.
         This function does not literally resize image to the new size, it briefly following principles below:
         1. Original images cannot be scaled up, but can be scaled down: if the image is too small, it will not be
-        recognized by tf model, even if scaled into a larger one
+        recognized by tf model, even if scaled into a larger one（存疑）
         2. Images with smaller size should be padded into a larger one
         3. Both of the width and height axis should be scaled at the same ratio
         4. A binaryzation will be performed in the end
@@ -214,6 +215,14 @@ class TextChar:
         })
         self._c = c
 
+    def get_re_splitters(self):
+        self.valid(set_to=False)
+        vertical_smooth = (0, 0)
+        vertical_sum_array = proj.project(self.img, direction='vertical', smooth=vertical_smooth)
+        char_splitters = proj.get_re_splitter_end(vertical_sum_array)
+        char_splitters = [0] + char_splitters + [self.get_width()]
+        return char_splitters
+
     @property
     def c(self):
         """
@@ -274,7 +283,7 @@ class TextLine:
         self.__merged_from = []
         self.__merged_char = []
 
-    def get_char_splitters(self):
+    def get_char_splitters(self, gap=2):
         """
 
         :return:
@@ -282,12 +291,17 @@ class TextLine:
         # vertical_smooth = max(5, (lower - upper) // 6), 6
         vertical_smooth = (0, 0)
         vertical_sum_array = proj.project(self.img, direction='vertical', smooth=vertical_smooth)
-        char_splitters = proj.get_splitter_end(vertical_sum_array)
+        print("vertical_sum_array: "+str(vertical_sum_array))
+        if gap == 2:
+            char_splitters = proj.get_splitter_end(vertical_sum_array)
+        else:
+            char_splitters = proj.get_re_splitter_end(vertical_sum_array)
         # char_splitters = proj.get_splitter(vertical_sum_array)
         return char_splitters
 
     def split(self, force=False) -> List[TextChar]:
         """
+
         Split the line image into char images. If this function has been invoked before, do nothing.
         :param force: force to do splitting, even if `split` has been invoked.
         :return:
@@ -296,6 +310,10 @@ class TextLine:
             return self.__text_chars
         else:
             splitters = self.get_char_splitters()
+            print("text_line_splitters: "+str(splitters))
+
+            assert len(splitters) > 1
+
             self.__text_chars = list(
                 filter(lambda tc: tc.has_content(),
                        [TextChar(self.img[:, l:r],
@@ -305,12 +323,45 @@ class TextLine:
                         zip(splitters, splitters[1:])]
                        )
             )
+            line_std_width = self.get_relative_standard_width(False)
+            print("line_std_width: "+str(line_std_width))
+
+            if line_std_width is False:
+                splitters = self.get_char_splitters(gap=1)
+                self.__text_chars = list(
+                    filter(lambda tc: tc.has_content(),
+                           [TextChar(self.img[:, l:r],
+                                     offset_x=l,
+                                     drawing_copy=self.drawing_copy[:, l:r] if self.drawing_copy is not None else None)
+                            for
+                            l, r in
+                            zip(splitters, splitters[1:])]
+                           )
+                )
+            else:
+                real_chars = []
+                for c in self.__text_chars:
+                    re_splitters = c.get_re_splitters()
+                    splitters += [i+c.offset_x for i in re_splitters]
+                    if self.__relative_width(c.get_width()) > 1.5 * line_std_width:
+                        replace_chars = list(
+                            filter(lambda tc: tc.has_content(),
+                                   [TextChar(c.img[:, l:r],
+                                    offset_x=c.offset_x+l,
+                                    drawing_copy=self.drawing_copy[:, l:r] if c.drawing_copy is not None else None)
+                                   for l, r in zip(re_splitters, re_splitters[1:])])
+                        )
+                        real_chars += replace_chars
+                    else:
+                        real_chars.append(c)
+                self.__text_chars = real_chars
 
             if self.drawing_copy is not None:
                 self.drawing_copy[:, splitters] = 120
 
             return self.__text_chars
 
+    # todo 修正只有一个字时的问题
     def calculate_meanline_regression(self) -> bool:
         """
         The regression function towards the center points of text contents in char images.
@@ -359,6 +410,7 @@ class TextLine:
         Assertion failed, one possible reason: Which char is valid or not is unclear before `set_results()`
         """
         cnt = {}
+        print("height:"+str(self.get_line_height()))
         for h in map(lambda c: self.__relative_width(c.get_content_width()),
                      # for h in map(lambda c: self.__relative_width(c.get_width()),
                      self.get_chars(only_valid=only_valid_char)):
@@ -367,17 +419,38 @@ class TextLine:
             cnt[h] += 1
         # 先选出占比最大的两个宽度，这是因为当一行中的标点符号和数字太多时，宽度众数不是中文宽度，而是数字宽度
         # 注意：频次为小于2的不应当称为`众数`，它们只是离群点
+        # 当时实在没有众数的时候，只好找最接近1的数，因为之前切行时行高会偏大，所以倾向找小于1的数
+        # 最差的情况是切字的结果得到的相对大小一律大于1.5，那么返回false表示按2 pixels有些大，需要重新切字
+        print("相对大小："+str(cnt))
         public_num_2 = sorted(
-            filter(lambda i: i[1] > 1, cnt.items()),
+            filter(lambda i: i[0] < 1 < i[1], cnt.items()),
             key=lambda i: i[1], reverse=True
         )[:2]
-
+        # 默认前面文字检测有效，即必有有效字
         if len(public_num_2) == 0:
-            self.empty(set_to=True)
-            self.std_width = False
+            # self.empty(set_to=True)
+            # self.std_width = False
+            near = sorted(cnt.items(), key=lambda i: abs(i[0] - 1))
+            # 最小的比值大于1.0代表切字可能切的过大
+            if near[0][0] > MULTI_CHAR_THRESH_FACTOR:
+                self.std_width = False
+            elif len(near) == 1:
+                self.std_width = near[0][0]
+            else:
+                if near[0][0] > 0.5:
+                    self.std_width = near[0][0]
+                else:
+                    self.std_width = near[1][0]
             return self.std_width
         # 从两个众数中，选择宽度大的那一个，作为标准相对宽度
+        # 上面那个说法好像有时候不大靠谱，毕竟char的高度可能也不靠谱。。
+        # fixme 暂时默认st_width应该大于0.5而小于1.0，但这应该仅能应用于印刷体
+
         self.std_width = max(map(lambda x: x[0], public_num_2))
+
+        if self.std_width > MULTI_CHAR_THRESH_FACTOR:
+            self.std_width = False
+            return False
 
         if self.drawing_copy is not None:
             self.drawing_copy[5:-5, :int(self.std_width * self.get_line_height())] = 50, 50, 50
@@ -393,12 +466,11 @@ class TextLine:
 
         *If the predication result of a 'half char' is a chinese character, it indicates that an
          `over split` case might has happened, that is, an image containing a single chinese character
-        has been splited into two or more images for predicting. We will fix such cases in the following
+        has been splitted into two or more images for predicting. We will fix such cases in the following
         steps*
         :return:
         """
-        if self.std_width is None:
-            self.get_relative_standard_width()
+        self.get_relative_standard_width(True)
 
         if self.std_width is False:
             return self
@@ -407,6 +479,7 @@ class TextLine:
         for c in self.get_chars(only_valid=True):
             if c.valid() and self.__relative_width(c.get_width()) < half_thresh:
                 c.half(set_to=True)
+                print("Predicted half: "+c._c)
                 c.draw((-5, -1), (5, -5), (20, 200, 20))
         return self
 
@@ -419,8 +492,12 @@ class TextLine:
         """
         if self.a is None or self.b is None:
             self.calculate_meanline_regression()
-
         offset = 0
+        if self.a is None and self.b is None:
+            for char in self.get_chars():
+                char.location('floor')
+                offset += char.get_width()
+            return
         for char in self.get_chars():
             center_y, center_x = char.get_content_center()
             y_ = self.regression_fn(center_x + offset)
@@ -433,6 +510,7 @@ class TextLine:
         **target**: the `char` that takes only half a `std_width` but predication result is a chinese character
 
         > A chinese character takes one full `std_width`
+        todo there is a problem that a chinese character is probably predicated as a punctuation.
         :return:
         """
         if self.std_width is False:
@@ -498,6 +576,7 @@ class TextLine:
             if not char.valid():
                 continue
             if is_chinese(char.c) and char.half():
+                print("half chinese:" + char.c)
                 # 预测出是汉字但只占半个字符位置
                 char.draw((-15, -10), (None, -4), (20, 20, 180))
 
@@ -586,11 +665,12 @@ class TextPage:
 
     def remove_lines(self, origin_size=None):
         h, w = self.img.shape[:2] if origin_size is None else origin_size
-        threshold = int(sqrt(h ** 2 + w ** 2) // 20)
+        threshold = int(h * 1.5)
         gap = int(w // 300 + 2)
-        min_length = int(sqrt(h ** 2 + w ** 2) // 30)
+        min_length = int(h * 1.5)
         self.img = 255 - self.img
         print("[Hough Args] threshold=%d, gap=%d, min_length=%d" % (threshold, gap, min_length))
+        # 使用hough变换查找线段
         lines = cv.HoughLinesP(self.img, 1, np.pi / 100, threshold,
                                minLineLength=min_length, maxLineGap=gap)
         _lines = [] if lines is None else lines[:, 0, :]  # 提取为二维
@@ -600,7 +680,9 @@ class TextPage:
         return self
 
     def auto_bin(self):
-        self.img = uimg.auto_bin(self.img, otsu=True)
+        temp = self.img
+        self.img = uimg.auto_bin(temp, otsu=True)
+
         return self
 
     def fix_orientation(self):
@@ -614,27 +696,43 @@ class TextPage:
             horizontal_smooth = (0, 0)
             # horizontal_smooth = min(15, (self.img.shape[0] * self.img.shape[1]) // 100000), 9
             horizontal_sum_array = proj.project(self.img, direction='horizontal', smooth=horizontal_smooth)
+            # start, end = 0, len(horizontal_sum_array)-1
+            # while horizontal_sum_array[start] == 0 and start < end:
+            #     start += 1
+            #
+            # while horizontal_sum_array[end] == 0 and end != 0:
+            #     end -= 1
+            # height = end - start + 1
             line_splitters = proj.get_splitter_end(horizontal_sum_array)
-            # line_splitters = proj.get_splitter_horizontal(horizontal_sum_array)
-
+            print(line_splitters)
             if self.drawing_copy is not None:
                 self.drawing_copy[line_splitters, :] = 180
 
             for line_id, (upper, lower) in enumerate(zip(line_splitters, line_splitters[1:])):
+                print("upper: " + str(upper)+", lower: " + str(lower))
                 line_img = self.img[upper:lower, :]
-                line_drawing_copy = self.drawing_copy[upper:lower, :] if self.drawing_copy is not None else None
-                text_line = TextLine(line_img, line_id, drawing_copy=line_drawing_copy,
-                                     offset_y=upper)
-                self.__text_lines.append(text_line)
+                if np.sum(255-line_img) != 0:
+                    line_drawing_copy = self.drawing_copy[upper:lower, :] if self.drawing_copy is not None else None
+                    text_line = TextLine(line_img, line_id, drawing_copy=line_drawing_copy,
+                                         offset_y=upper)
+                    self.__text_lines.append(text_line)
+            #
+            # line_img = self.img
+            # line_drawing_copy = self.drawing_copy if self.drawing_copy is not None else None
+            # text_line = TextLine(line_img, 0, drawing_copy=line_drawing_copy, offset_y=0)
+            # text_line.set_line_height(height)
+            # self.__text_lines.append(text_line)
         return self.__text_lines
 
     def get_drawing_copy(self):
         return self.drawing_copy
 
+    # todo some problem here
     def get_lines(self, ignore_empty: bool = False) -> List[TextLine]:
         return list(filter(lambda line: not (ignore_empty and line.empty()), self.split(force=False)))
 
-    def make_infer_input_1(self, height=64, width=64):
+    # todo 对第一line.split进行再加工，把过长部分进行分割
+    def make_infer_input_1(self, name, height=64, width=64):
         """
         This function is for **first round** inferring, it will not include the merged chars
         :param height:
@@ -642,9 +740,21 @@ class TextPage:
         :return:
         """
         char_imgs = []
+        i = 0
         for line in self.split(force=False):
             for char in line.split(force=False):
-                char_imgs.append(char.fit_resize(height, width))
+                # todo add foreground as an attribute of TextLine and TextChar
+                # todo check if it's necessary to get top and bottom of lines and chars
+                char_img = char.fit_resize(height, width)
+                char_imgs.append(char_img)
+                # uimg.save('static\\' + name + str(i) + '.jpg', char_img)
+                count = 0
+                for m in range(height):
+                    for n in range(width):
+                        if char_img[m, n] == 0:
+                            count += 1
+                i += 1
+                print('static\\' + name + str(i) + '.jpg :'+ str(count))
         return char_imgs
 
     def make_infer_input_2(self, height=64, width=64):
@@ -659,9 +769,11 @@ class TextPage:
         for line in self.get_lines():
             for char in line.get_chars():
                 c, p = results[ptr]
+                print("char: "+str(c)+",score:"+str(p))
                 char.set_result(c, p=p)
                 ptr += 1
             line.filter_by_p(p_thresh=DEFAULT_NOISE_P_THRESH)
+        print('第一次結果得到字數:'+str(ptr))
 
     def set_result_2(self, results):
         ptr = 0
@@ -670,6 +782,7 @@ class TextPage:
                 c, p = results[ptr]
                 char.set_result(c, p=p)
                 ptr += 1
+        print("需要合并字数："+str(ptr))
 
     def iterate(self, window_size):
         assert window_size % 2 == 1

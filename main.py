@@ -119,7 +119,6 @@ class Main:
             .init_indices()
 
         print("start inferring")
-
         infer_batch = infer_data.next_batch(batch_size)
         self.sess.run(tf.local_variables_initializer())
 
@@ -148,6 +147,7 @@ class Main:
     def restore(self, ckpt_dir=None):
         self.saver = tf.train.Saver(tf.global_variables(), max_to_keep=5)
         ckpt_dir = ckpt_dir or args['ckpt']
+        print(ckpt_dir)
         ckpt = tf.train.latest_checkpoint(ckpt_dir)
         if ckpt:
             self.saver.restore(self.sess, ckpt)
