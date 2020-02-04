@@ -34,6 +34,7 @@ class Processor(object):
         # 1.
         # _page.auto_bin()
         if box is not None:
+            print('temp_box: '+str(box))
             x1, y1, x2, y2 = box
             # x1 = int(x1 * src.shape[1])
             # y1 = int(y1 * src.shape[0])

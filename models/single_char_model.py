@@ -3,7 +3,7 @@ import tensorflow as tf
 
 class Model:
 
-    def __init__(self, input_width, input_height, num_class, mode):
+    def __init__(self, input_width: int, input_height: int, num_class, mode):
         self.input_width = input_width
         self.input_height = input_height
         self.num_class = num_class
@@ -32,7 +32,7 @@ class Model:
         images = self.images
         labels = self.labels
 
-        input_layer = tf.reshape(images, [-1, self.input_height, self.input_width, 1])
+        input_layer = tf.reshape(images, [-1, int(self.input_height), int(self.input_width), 1])
 
         # cnn block 1
         x = tf.layers.conv2d(

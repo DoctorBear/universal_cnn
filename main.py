@@ -15,6 +15,7 @@ class Main:
     def __init__(self):
         config = tf.ConfigProto(allow_soft_placement=True)
         config.gpu_options.allow_growth = True
+        # self.graph = tf.Graph()
         self.sess = tf.Session(config=config)
         self.saver = None
 
@@ -105,6 +106,7 @@ class Main:
         input_width = input_width or args['input_width']
         input_height = input_height or args['input_height']
         num_class = num_class or args['num_class']
+
         if self.infer_model is None:
             self.infer_model = Model(input_width, input_height, num_class, 'infer')
             self.infer_model.build()

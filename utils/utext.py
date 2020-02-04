@@ -405,15 +405,18 @@ class TextLine:
     def regression_fn(self, x: float) -> int:
         return int(self.a * x + self.b)
 
-    def get_relative_standard_width(self, only_valid_char=True):
+    def get_relative_standard_width(self, only_valid_char=False):
         assert not self.empty() or not only_valid_char, """
         Assertion failed, one possible reason: Which char is valid or not is unclear before `set_results()`
         """
         cnt = {}
         print("height:"+str(self.get_line_height()))
+        valid_chars = self.get_chars(only_valid=only_valid_char)
+        if len(valid_chars) == 0:
+            return False
         for h in map(lambda c: self.__relative_width(c.get_content_width()),
                      # for h in map(lambda c: self.__relative_width(c.get_width()),
-                     self.get_chars(only_valid=only_valid_char)):
+                     valid_chars):
             if h not in cnt:
                 cnt[h] = 0
             cnt[h] += 1
@@ -427,6 +430,7 @@ class TextLine:
             key=lambda i: i[1], reverse=True
         )[:2]
         # 默认前面文字检测有效，即必有有效字
+        # todo 噗，文字检测检测出来的文字不一定能识别出来。。。
         if len(public_num_2) == 0:
             # self.empty(set_to=True)
             # self.std_width = False
@@ -747,7 +751,7 @@ class TextPage:
                 # todo check if it's necessary to get top and bottom of lines and chars
                 char_img = char.fit_resize(height, width)
                 char_imgs.append(char_img)
-                # uimg.save('static\\' + name + str(i) + '.jpg', char_img)
+                uimg.save('static\\' + name + str(i) + '.jpg', char_img)
                 count = 0
                 for m in range(height):
                     for n in range(width):
@@ -803,13 +807,8 @@ class TextPage:
         buff = []
         for line in self.get_lines(ignore_empty=True):
             line_buff = []
-            # 不知道当时为什么没有将`replace_merged`设置为`True`，而是在下面进行merge
-            # todo 字符合并的逻辑应当移入`line.get_chars()`中
-            for char in line.get_chars():
+            for char in line.get_chars(replace_merged=True):
                 line_buff.append(char.c if char.p > p_thresh else '')
-            for m_indices, m_char in zip(line.get_merged_indices(), line.get_merged_chars()):
-                line_buff[m_indices[0]:m_indices[-1]] = ['' for _ in m_indices[:-1]]
-                line_buff[m_indices[-1]] = m_char.c if m_char.p > p_thresh else ''
             buff.append(''.join(line_buff))
         return '\n'.join(buff)
 

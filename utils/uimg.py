@@ -129,13 +129,20 @@ def fit_resize(img, new_height, new_width):
     dsize = int(width / rate), int(height / rate)
     try:
         resized_img = auto_bin(cv.resize(img, dsize), otsu=True)
-            # if rate >= 1 else img
-        return pad_to(resized_img, new_height, new_width, 255)
+        return pad_around(resized_img, new_height, new_width, 255)
     except cv.error:
         return None
 
 
-def pad_to(img, new_height, new_width, padding_val):
+def pad_right_and_below(img, new_height, new_width, padding_val=255):
+    height, width = img.shape[:2]
+    assert height <= new_height and width <= new_width
+    top, left, bottom, right = 0, 0, new_height - height, new_width-width
+    out_img = cv.copyMakeBorder(img, top, bottom, left, right, cv.BORDER_CONSTANT, value=padding_val)
+    return out_img
+
+
+def pad_around(img, new_height, new_width, padding_val):
     height, width = img.shape[:2]
     assert height <= new_height and width <= new_width
     top = (new_height - height) // 2
@@ -153,5 +160,5 @@ if __name__ == '__main__':
         h, w = rd.randint(30, 80), rd.randint(30, 80)
         origin = np.ones((h, w), dtype=np.uint8) * 255
         fit = fit_resize(origin, 64, 64)
-        out = pad_to(fit, 64, 64, 100)
+        out = pad_around(fit, 64, 64, 100)
         save("/usr/local/src/data/%d_%dx%d.png" % (i, h, w), out)

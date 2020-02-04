@@ -21,7 +21,7 @@ def to_size(img, new_height, new_width):
     if 0 in text_img.shape or None in (top, left, bottom, right):
         # 宽或高为0
         return None
-    text_img = uimg.pad_to(text_img, int(1.4*img.shape[0]), int(1.4*(right-left)), 255)
+    text_img = uimg.pad_around(text_img, int(1.4*img.shape[0]), int(1.4*(right-left)), 255)
     out_img = uimg.fit_resize(text_img, new_height, new_width)
     return out_img
 
