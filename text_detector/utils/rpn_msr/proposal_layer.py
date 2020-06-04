@@ -38,8 +38,8 @@ def proposal_layer(rpn_cls_prob_reshape, rpn_bbox_pred, im_info, _feat_stride=[1
     #layer_params = yaml.load(self.param_str_)
     """
 
-    _anchors = generate_anchors(scales=np.array(anchor_scales))  # 生成基本的9个anchor
-    _num_anchors = _anchors.shape[0]  # 9个anchor
+    _anchors = generate_anchors(scales=np.array(anchor_scales))  # 生成基本的10个anchor
+    _num_anchors = _anchors.shape[0]  # 10个anchor
 
     im_info = im_info[0]  # 原始图像的高宽、缩放尺度
 

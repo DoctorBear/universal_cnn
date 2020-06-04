@@ -9,6 +9,12 @@ from text_detector.utils.rpn_msr.proposal_layer import proposal_layer
 from text_detector.utils.text_connector.detectors import TextDetector
 
 
+'''
+The reproduction of the CTPN model in this project comes from:
+Github: https://github.com/eragonruan/text-detection-ctpn
+Author: eragonruan, banjin-xjy
+License: MIT
+'''
 class CtpnProcessor:
     _instance = None
     _instance_lock = threading.Lock()
@@ -54,6 +60,7 @@ class CtpnProcessor:
         self.saver.restore(self.sess, ckpt)
 
     def detect(self, img, im_info):
+        print('boom here!')
         with self.sess.as_default():
             with self.graph.as_default():
                 bbox_pred_val, cls_prob_val = self.sess.run([self.bbox_pred, self.cls_prob],
@@ -69,7 +76,7 @@ class CtpnProcessor:
                 # proposal_time = time.time()
                 # print("Proposal cost time: {:.2f}s".format(proposal_time - net_time))
 
-                textdetector = TextDetector(DETECT_MODE='H')
+                textdetector = TextDetector()
                 boxes = textdetector.detect(textsegs, scores[:, np.newaxis], img.shape[:2])
                 boxes = np.array(boxes, dtype=np.int)
                 return boxes, scores

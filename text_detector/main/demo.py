@@ -6,7 +6,6 @@ import time
 
 import cv2
 import numpy as np
-import math
 import tensorflow as tf
 
 from text_detector.processing.ctpn_processor import CtpnProcessor

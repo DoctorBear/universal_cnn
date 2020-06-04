@@ -301,7 +301,6 @@ class TextLine:
 
     def split(self, force=False) -> List[TextChar]:
         """
-
         Split the line image into char images. If this function has been invoked before, do nothing.
         :param force: force to do splitting, even if `split` has been invoked.
         :return:
@@ -324,7 +323,6 @@ class TextLine:
                        )
             )
             line_std_width = self.get_relative_standard_width(False)
-            print("line_std_width: "+str(line_std_width))
 
             if line_std_width is False:
                 splitters = self.get_char_splitters(gap=1)
@@ -430,10 +428,7 @@ class TextLine:
             key=lambda i: i[1], reverse=True
         )[:2]
         # 默认前面文字检测有效，即必有有效字
-        # todo 噗，文字检测检测出来的文字不一定能识别出来。。。
         if len(public_num_2) == 0:
-            # self.empty(set_to=True)
-            # self.std_width = False
             near = sorted(cnt.items(), key=lambda i: abs(i[0] - 1))
             # 最小的比值大于1.0代表切字可能切的过大
             if near[0][0] > MULTI_CHAR_THRESH_FACTOR:
@@ -582,7 +577,7 @@ class TextLine:
             if is_chinese(char.c) and char.half():
                 print("half chinese:" + char.c)
                 # 预测出是汉字但只占半个字符位置
-                char.draw((-15, -10), (None, -4), (20, 20, 180))
+                # char.draw((-15, -10), (None, -4), (20, 20, 180))
 
                 if self.get_char_at(i).merged is True:
                     continue
@@ -671,7 +666,7 @@ class TextPage:
         h, w = self.img.shape[:2] if origin_size is None else origin_size
         threshold = int(h * 1.5)
         gap = int(w // 300 + 2)
-        min_length = int(h * 1.5)
+        min_length = int(h * 3)
         self.img = 255 - self.img
         print("[Hough Args] threshold=%d, gap=%d, min_length=%d" % (threshold, gap, min_length))
         # 使用hough变换查找线段
@@ -687,10 +682,6 @@ class TextPage:
         temp = self.img
         self.img = uimg.auto_bin(temp, otsu=True)
 
-        return self
-
-    def fix_orientation(self):
-        self.img = fix_orientation(self.img)
         return self
 
     def split(self, force=False) -> List[TextLine]:
@@ -736,7 +727,7 @@ class TextPage:
         return list(filter(lambda line: not (ignore_empty and line.empty()), self.split(force=False)))
 
     # todo 对第一line.split进行再加工，把过长部分进行分割
-    def make_infer_input_1(self, name, height=64, width=64):
+    def make_input_1(self, name, height=64, width=64):
         """
         This function is for **first round** inferring, it will not include the merged chars
         :param height:
@@ -747,8 +738,6 @@ class TextPage:
         i = 0
         for line in self.split(force=False):
             for char in line.split(force=False):
-                # todo add foreground as an attribute of TextLine and TextChar
-                # todo check if it's necessary to get top and bottom of lines and chars
                 char_img = char.fit_resize(height, width)
                 char_imgs.append(char_img)
                 uimg.save('static\\' + name + str(i) + '.jpg', char_img)
@@ -761,7 +750,7 @@ class TextPage:
                 print('static\\' + name + str(i) + '.jpg :'+ str(count))
         return char_imgs
 
-    def make_infer_input_2(self, height=64, width=64):
+    def make_input_2(self, height=64, width=64):
         char_imgs = []
         for line in self.get_lines(ignore_empty=True):
             for m_char in line.get_merged_chars():
@@ -798,19 +787,21 @@ class TextPage:
         for i in range(r, len(compressed) - r):
             yield compressed[i - r: i + r + 1]
 
-    def format_result(self, p_thresh=DEFAULT_NOISE_P_THRESH) -> str:
+    def format_result(self, p_thresh=DEFAULT_NOISE_P_THRESH):
         """
         
         :param p_thresh: 
         :return: The text result of ocr
         """
         buff = []
+        lines_height = []
         for line in self.get_lines(ignore_empty=True):
             line_buff = []
             for char in line.get_chars(replace_merged=True):
                 line_buff.append(char.c if char.p > p_thresh else '')
             buff.append(''.join(line_buff))
-        return '\n'.join(buff)
+            lines_height.append(line.get_line_height())
+        return '\n'.join(buff), lines_height
 
     def format_verbose(self, p_thresh=DEFAULT_NOISE_P_THRESH) -> dict:
         """
@@ -913,3 +904,14 @@ class TextPage:
     def mark_char_location(self):
         for line in self.get_lines(ignore_empty=True):
             line.mark_location()
+
+
+if __name__ == '__main__':
+    # src = uimg.read('../ctpn_output/part.jpg', 1)
+    # _page = TextPage(src, 0)
+    # _page.remove_lines()
+    # uimg.save('../ctpn_output/1.jpg', _page.img)
+    a = [1, 2]
+    b = [1, 2]
+    print(a==b)
+

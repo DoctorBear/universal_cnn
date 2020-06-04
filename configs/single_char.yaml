@@ -1,4 +1,4 @@
-name: single_char
+ame: single_char
 
 # `train` or `infer`, will be override by cmd args
 mode: 'train'

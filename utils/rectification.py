@@ -8,9 +8,9 @@ def rectify_by_location(char_gen: Generator):
         if char.c in ('，', '’'):
             char.set_content_text('，' if char.location() == 'floor' else '’',
                                   msg='char is on %s' % char.location())
-        if char.c in ('o', '。'):
-            char.set_content_text('。' if char.location() == 'floor' else 'o',
-                                  msg='char is on %s' % char.location())
+        # if char.c in ('o', '。'):
+        #     char.set_content_text('。' if char.location() == 'floor' else 'o',
+        #                           msg='char is on %s' % char.location())
 
 
 def rectify_5(char_gen: Generator):

@@ -1,6 +1,7 @@
 import cv2 as cv
 import numpy as np
 from matplotlib import pyplot as plt
+from PIL import Image
 
 
 def get_bounds(img, foreground_color='black'):
@@ -89,6 +90,11 @@ def auto_bin(img, otsu: bool = False):
     # 自适应二值化
     img_at_mean = cv.adaptiveThreshold(img_grey, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 47, 10)
     return img_at_mean
+
+
+def open_in_rgb(path):
+    image = Image.open(path)
+    return np.array(image.convert('RGB'))
 
 
 # 固定阈值二值化

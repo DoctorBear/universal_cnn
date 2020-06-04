@@ -2,7 +2,7 @@ import argparse
 import json
 
 from data import SingleCharData
-from main import Main
+from ocr_processor import OcrProcessor
 
 parse = argparse.ArgumentParser()
 
@@ -18,8 +18,8 @@ if __name__ == '__main__':
 
     data = SingleCharData(64, 64)
     data.load_char_map("label_maps/single_pld_3990.json").read(args.src_dir).init_indices()
-    main = Main()
-    results = main.infer(data, batch_size=64, ckpt_dir=args.ckpt_dir)
+    main = OcrProcessor()
+    results = main.recognize(data, batch_size=64)
     labels = data.unmap(data.labels)
 
     char_map = {}

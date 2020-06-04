@@ -128,6 +128,7 @@ class AbstractData:
             self.batch_ptr = end
             return self.images[indices], self.labels[indices]
 
+    # todo 得搞清楚这段代码干啥的，似乎是用来做解码的
     def unmap(self, src):
         if isinstance(src, str):
             return self.label_map_reverse[src]

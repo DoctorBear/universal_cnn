@@ -21,7 +21,16 @@ def unify_sep(path):
         return path
 
 
+# 修正pdf密码中作为索引的路径中的路径分隔符
+def unify_dict_sep(conf: dict):
+    result = {}
+    for k, v in conf.items():
+        result[unify_sep(k)] = v
+    return result
+
+
 if __name__ == '__main__':
+    print(app_path())
     a = app_path()+'\\/\\/'
     print(a)
     print(unify_sep(a))

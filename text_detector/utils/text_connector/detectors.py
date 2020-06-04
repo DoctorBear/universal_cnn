@@ -4,16 +4,11 @@ from text_detector.utils.bbox.nms import nms
 
 from .text_connect_cfg import Config as TextLineCfg
 from .text_proposal_connector import TextProposalConnector
-from .text_proposal_connector_oriented import TextProposalConnector as TextProposalConnectorOriented
 
 
 class TextDetector:
-    def __init__(self, DETECT_MODE="H"):
-        self.mode = DETECT_MODE
-        if self.mode == "H":
-            self.text_proposal_connector = TextProposalConnector()
-        elif self.mode == "O":
-            self.text_proposal_connector = TextProposalConnectorOriented()
+    def __init__(self):
+        self.text_proposal_connector = TextProposalConnector()
 
     def detect(self, text_proposals, scores, size):
         # 删除得分较低的proposal
