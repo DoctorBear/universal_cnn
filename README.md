@@ -1,84 +1,22 @@
 
-***软院同学参考[学院内网环境下的使用说明](./docs/学院内网环境下的使用说明.md)下载***
+# 从图像到文本的批量预处理系统的线下工具部分
 
----
-# 依赖
-| 依赖 | 安装示例 |
-| --- | --- |
-| cv2 | `pip install opencv-python` |
-| tensorflow | `pip install tensorflow==1.11.0` |
-| yaml | `pip install pyyaml` |
-| flask | `pip install Flask` |
-| progressbar | `pip install progressbar2` |
+该部分的定位为可运行于离线Windows环境的exe文件，所以在改进代码后请查看打包文档进行部署。
 
-# TODO
-- 添加文件上传功能
+该部分的主体功能为检索目标文件夹下的目标格式的文件，包含图像文件（JPG, PNG, BMP, TIF, GIF）和包含图像的文档（PDF），并将目标文件中图像中的文本提取或者识别出来进行整理得到元数据文件（JSON）、参考文本（TXT）、可视化文件（HTML），供线上分析、阅读和文档内容校对。
 
-# 使用
-OCR服务以web的方式对外提供接口。 推荐使用我们发布的docker镜像，~~点击下载(不可用)~~，镜像支持linux、mac、windows平台。
+该部分分为文件预处理、文本检测、文本识别和识别结果整理四个部分，其中的文本检测和文本识别分别为对以下两个项目的封装改进：
 
-> 安装windows版docker的过程中，请根据提示选择`启用hyper-v`
-> **特别注意** 非windows专业版用户安装docker请参考[@惠天宇](https://blog.csdn.net/zhuiyisinian/article/details/88700889)
+*[CTPN项目](https://github.com/eragonruan/text-detection-ctpn)
+
+*[universal_cnn](https://github.com/NJUOCR/universal_cnn)
+
+对应的模型数据也是直接使用了这两个项目的数据，universal_cnn的数据位于学院内网IP为192.168.68.38的服务器上。
+
+除了提取文本这一主体功能，在识别结果整理部分会生成同原图排版相同的可视化文件（HTML），可以使用工具完成可视化文件（HTML）和元数据文件（JSON，最终上传的结果）之间的相互转换，以便于对识别结果进行校对。
 
 
-## 在docker中启动服务
-### 1. 更改服务端口
-在`app.py`中修改`port`对应的数值，下面代码中使用`4444`作为服务端口
-``` python
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=4444, debug=False, threaded=False)
-```
 
-### 2. 启动服务
-进入项目根目录，并使用**python3**运行`app.py`
-``` shell
-cd /usr/local/src/universal_cnn
-python3 app.py
-```
 
-> 预训练模型已在docker镜像中配置好，无需额外配置
 
-## 使用OCR服务
-服务接口为标准GET请求：
-`http://$(host):$(port)/?path=$(your_image_path)[&auxiliary=1][&remove_lines=1][&verbose=1]`
 
-### 参数说明
-| 键 | 类型 | 说明 |
-| --- | --- | --- |
-| path | *必填* |  `your_image_path`是需要做识别的图片路径，**务必确保它已经位于容器中，或已通过其他方式挂载进容器** |
-| auxiliary | *OCR开发人员可选* | 是否缓存中间过程图片，可以用来分析识别结果 |
-| remove_lines | *可选* | 尝试去除图片中的下划线和表格框 |
-| verbose | *可选* | 获取关于识别文字的*位置*、*大小*等，请参考[获取更多信息](./docs/获取关于识别结果的更多信息.md)
-
-### 示例
-使用`wget`调用服务，建议在URI中加入引号。
-``` shell
-wget -O out.txt 'http://[your_host]:[port]/?path=test_data/test0.png&remove_lines=1'
-```
-识别结果会写入`out.txt`
-
-> 我们在镜像中准备了一些测试用的图片，位置：`[project_root]/test_data`
-# Trouble Shooting
-> 在直接使用我们提供的Docker镜像时，一般不会出现下列问题
-## 1. 缺少动态链接库
-### 1.1 Cannot open ** libSM.so.6 ** when import cv2:
-
-``` shell
-apt install -y libsm6 libxext6
-```
-
-*by [StackOverflow](https://stackoverflow.com/search?q=import+cv2+libXrender.so.1+)*
-
-### 1.2 Cannot open ** libXrender.so.1 ** when import cv2:
-
-``` shell
-sudo apt-get install libxrender1
-```
-*by [StackOverflow](https://stackoverflow.com/questions/47113029/importerror-libsm-so-6-cannot-open-shared-object-file-no-such-file-or-directo)*
-
-### 1.3 Cannot open **libGL.so.1**
-``` shell
-apt install libgl1-mesa-glx
-```
-
-*by [StackOverflow](https://stackoverflow.com/questions/45266042/ipython-import-matplotlib-pyplot-showed-that-libgl-so-1-no-such-file)*
